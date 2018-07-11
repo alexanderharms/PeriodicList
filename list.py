@@ -23,6 +23,7 @@ Extend with Gmail and Google calendar integration
 import argparse
 import sqlite3
 from datetime import datetime, timedelta, date
+from tabulate import tabulate
 
 def connect_database():
     conn = sqlite3.connect('periodiclist.db')
@@ -38,55 +39,100 @@ def connect_database():
     conn.commit()
     return conn
 
+def update_database(conn):
+    cursor = conn.cursor()
+    idsDB = cursor.execute('''SELECT id FROM list;''')
+    ids = idsDB.fetchall()
+
+    for id in ids:
+        id = int(id[0])
+        planned = cursor.execute('''SELECT plan FROM list WHERE id=(?);''', (id,))
+        planned = planned.fetchone()[0]
+        planned = datetime.strptime(planned, '%Y-%m-%d')
+        planned = planned.date()
+        daysleft = int((planned - date.today()).days)
+        conn.execute('''UPDATE list SET daysleft=(?) WHERE id=(?);''',
+                        (daysleft, id))
+        conn.commit()
+    return
+
 def show_list(conn):
     cursor = conn.execute('''SELECT * FROM list;''')
-    print("Id Item \t Period \t Last renewed \t Planned \t" +
-            "Days Left \n")
+    headers = ['Id', 'Item', 'Period', 'Last renewed', 'Planned', 'Days Left']
+    table_content = []
     for row in cursor:
-        lastrenewed = row[3].strftime('%d-%m-%y')
-        planned = row[4].strftime('%d-%m-%y')
-        print("%d %s \t %s \t %s \t %s \t %d \n" % (row[0], row[1], row[2],
-                lastrenewed, planned, row[5]))
+        row_content = [row[0], row[1], row[2], row[3], row[4], row[5]]
+        table_content.append(row_content)
+
+    print(tabulate(table_content, headers, tablefmt='plain'))
 
 def add_item(conn):
     itemname = input("Enter item name: ")
     period = int(input("Period in days: "))
     lastrenewed = datetime.strptime(input("Last renewed (dd-mm-yy): "), '%d-%m-%y')
-    planned = lastrenewed.date() + timedelta(days=period)
+    lastrenewed = lastrenewed.date()
+    planned = lastrenewed + timedelta(days=period)
     daysleft = int((planned - date.today()).days)
-    print(daysleft)
+
+    cursor = conn.cursor()
+    ids = cursor.execute('''SELECT id FROM list;''')
+    entries_id = ids.fetchall()
+
+    if len(entries_id) < 1:
+        new_id = 1
+    else:
+        new_id = max(entries_id)[0] + 1
+
     conn.execute('''INSERT INTO list VALUES (?, ?, ?, ?, ?, ?);''',
-            (1, itemname, period, lastrenewed, planned, daysleft))
+            (new_id, itemname, period, lastrenewed, planned, daysleft))
     conn.commit()
-    #        Enter item name:
-    #        Period in days/weeks/months/years:
-    #        Last renewed (dd/mm/yy):
-    # Assign lowest ID still available
     return
 
 def delete_item(conn):
-    # Which item do you want to delete?
-    # Does that item_exist()?
-    # if yes, delete, if no exit
+    del_id = input("Item to delete: ")
+
+    for entry in item_exist(conn, del_id):
+        existance = entry[0]
+    if existance:
+        conn.execute('''DELETE FROM list WHERE id = (?);''', (del_id))
+        conn.commit()
+    else:
+        print("Item does not exist.")
     return
 
 def update_item(conn):
-    # Which item do you want to update?
-    # Does that item_exist()?
-    # if no, exit
-    # Update today?
-    # If no, what date?
-    # Update
+    update_id = input("Item to update: ")
+    update_date = datetime.strptime(input("Last renewed (dd-mm-yy): "), '%d-%m-%y')
+    update_date = update_date.date()
+
+    for entry in item_exist(conn, update_id):
+        existance = entry[0]
+    if existance:
+        cursor = conn.cursor()
+        periodDB = cursor.execute('''SELECT period FROM list WHERE id = (?);''',
+                                  (update_id))
+        for entry in periodDB:
+            period = int(entry[0])
+        update_plan_date = update_date + timedelta(days=period)
+
+        conn.execute('''UPDATE list SET last = (?) WHERE id = (?);''',
+                        (update_date, update_id))
+        conn.execute('''UPDATE list SET plan = (?) WHERE id = (?);''',
+                        (update_plan_date, update_id))
+        conn.commit()
+    else:
+        print("Item does not exist.")
     return
 
 def item_exist(conn, id):
     # Check database if id exists
+    cursor = conn.cursor()
+    existance = cursor.execute('''SELECT COUNT(1) FROM list WHERE id=(?);''', (id))
     return existance
 
 def run(args):
     conn = connect_database()
-        # Calculate days left
-        # Update database
+    update_database(conn)
 
     if args.showlist:
         show_list(conn)
@@ -102,8 +148,6 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description="Keep track of periodic things.")
-    # Create new database
-    # parser.add_argument("-c", "--credb", dest="createdb", action="store_true")
     # Show list
     parser.add_argument("-s", "--show", dest="showlist", action="store_true")
     # Add entry
@@ -112,8 +156,6 @@ def main():
     parser.add_argument("-u", "--update", dest="update", action="store_true")
     # Delete entry
     parser.add_argument("-d", "--del", dest="delitem", action="store_true")
-
-    # parser.add_argument("-z", dest="zaak", type=str, required=False)
 
     parser.set_defaults(func=run)
     args = parser.parse_args()
