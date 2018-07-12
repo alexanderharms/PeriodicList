@@ -131,6 +131,37 @@ def item_exist(conn, id):
     existance = cursor.execute('''SELECT COUNT(1) FROM list WHERE id=(?);''', (id))
     return existance
 
+def action_tree(conn):
+    action_trigger = 1
+    while action_trigger:
+        action = input("Input action [a/u/d/q]: ")
+        if action == 'a':
+            add_item(conn)
+            action_trigger = more_actions(conn)
+        elif action == 'u':
+            update_item(conn)
+            action_trigger = more_actions(conn)
+        elif action == 'd':
+            delete_item(conn)
+            action_trigger = more_actions(conn)
+        elif action == 'q':
+            action_trigger = 0
+        else:
+            print("Unknown action.")
+            action_trigger = 1
+    return
+
+def more_actions(conn):
+    choice = input("More actions? [y/n] ")
+    if choice == 'y':
+        action_trigger = 1
+    elif choice == 'n':
+        action_trigger = 0
+    else:
+        print("Unknown response; assumed no.")
+        action_trigger = 0
+    return action_trigger
+
 def run(args):
     pathname = os.path.dirname(sys.argv[0])
     database_path = pathname + '/periodiclist.db'
@@ -147,6 +178,7 @@ def run(args):
     else:
         show_list(conn)
 
+    action_tree(conn)
     conn.close()
     print("Closed connection.")
 
