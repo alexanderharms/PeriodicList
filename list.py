@@ -18,16 +18,17 @@ Accepts commands such as:
     Delete entry with index 2
         list.py --delete 2
 
-Store as SQL database? Good excersise even if it is way way way overkill.
-Extend with Gmail and Google calendar integration
+Extend with Gmail and Google calendar integration?
 """
+import sys, os
+
 import argparse
 import sqlite3
 from datetime import datetime, timedelta, date
 from tabulate import tabulate
 
-def connect_database():
-    conn = sqlite3.connect('periodiclist.db')
+def connect_database(database_path):
+    conn = sqlite3.connect(database_path)
     print("Opened connection.")
     conn.execute('''CREATE table IF NOT EXISTS list
              (id INTEGER,
@@ -131,7 +132,10 @@ def item_exist(conn, id):
     return existance
 
 def run(args):
-    conn = connect_database()
+    pathname = os.path.dirname(sys.argv[0])
+    database_path = pathname + '/periodiclist.db'
+
+    conn = connect_database(database_path)
     update_database(conn)
 
     if args.additem:
@@ -160,6 +164,7 @@ def main():
     parser.set_defaults(func=run)
     args = parser.parse_args()
     args.func(args)
+    input()
 
 if __name__ == "__main__":
     main()
