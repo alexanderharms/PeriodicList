@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Simple command line tool to keep track of periodic things.
 Returns for example:
 Item            Period     Last renewed     Planned           Days left
@@ -125,7 +126,6 @@ def update_item(conn):
     return
 
 def item_exist(conn, id):
-    # Check database if id exists
     cursor = conn.cursor()
     existance = cursor.execute('''SELECT COUNT(1) FROM list WHERE id=(?);''', (id))
     return existance
@@ -134,14 +134,14 @@ def run(args):
     conn = connect_database()
     update_database(conn)
 
-    if args.showlist:
-        show_list(conn)
-    elif args.additem:
+    if args.additem:
         add_item(conn)
     elif args.update:
         update_item(conn)
     elif args.delitem:
         delete_item(conn)
+    else:
+        show_list(conn)
 
     conn.close()
     print("Closed connection.")
@@ -149,7 +149,7 @@ def run(args):
 def main():
     parser = argparse.ArgumentParser(description="Keep track of periodic things.")
     # Show list
-    parser.add_argument("-s", "--show", dest="showlist", action="store_true")
+    # parser.add_argument("-s", "--show", dest="showlist", action="store_true")
     # Add entry
     parser.add_argument("-a", "--add", dest="additem", action="store_true")
     # Update entry
