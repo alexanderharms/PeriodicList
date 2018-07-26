@@ -59,6 +59,7 @@ def update_database(conn):
     return
 
 def show_list(conn):
+    update_database(conn)
     cursor = conn.execute('''SELECT * FROM list;''')
     headers = ['Id', 'Item', 'Period', 'Last renewed', 'Planned', 'Days Left']
     table_content = []
@@ -77,13 +78,13 @@ def add_item(conn):
     daysleft = int((planned - date.today()).days)
 
     cursor = conn.cursor()
-    ids = cursor.execute('''SELECT id FROM list;''')
-    entries_id = ids.fetchall()
+    ids = cursor.execute('''SELECT MAX(id) FROM list;''')
+    max_id = ids.fetchall()
 
-    if len(entries_id) < 1:
+    if (max_id[0])[0] == None:
         new_id = 1
     else:
-        new_id = max(entries_id)[0] + 1
+        new_id = (max_id[0])[0] + 1
 
     conn.execute('''INSERT INTO list VALUES (?, ?, ?, ?, ?, ?);''',
             (new_id, itemname, period, lastrenewed, planned, daysleft))
@@ -127,14 +128,22 @@ def update_item(conn):
     return
 
 def item_exist(conn, id):
+    """ Check if item exists before trying to update or delete """
     cursor = conn.cursor()
     existance = cursor.execute('''SELECT COUNT(1) FROM list WHERE id=(?);''', (id))
     return existance
 
+def clear_console():
+    print("\033[H\033[J")
+
+def send_help():
+    print('Commands: \n s - Show list \n a - Add item \n u - Update item \n' +
+    ' d - Delete item \n q - Quit program \n c - Clear console and show list \n')
+
 def action_tree(conn):
     action_trigger = 1
     while action_trigger:
-        action = input("Input action [a/u/d/q]: ")
+        action = input("Input action [s/a/u/d/q]: ")
         if action == 'a':
             add_item(conn)
             action_trigger = more_actions(conn)
@@ -144,8 +153,16 @@ def action_tree(conn):
         elif action == 'd':
             delete_item(conn)
             action_trigger = more_actions(conn)
+        elif action == 's':
+            show_list(conn)
         elif action == 'q':
             action_trigger = 0
+        elif action == 'c':
+            clear_console()
+            show_list(conn)
+        elif action == 'help':
+            send_help()
+            show_list(conn)
         else:
             print("Unknown action.")
             action_trigger = 1
@@ -164,7 +181,12 @@ def more_actions(conn):
 
 def run(args):
     pathname = os.path.dirname(sys.argv[0])
-    database_path = pathname + '/periodiclist.db'
+    if len(pathname) == 0:
+        # Command was 'python3 list.py'
+        database_path = 'periodiclist.db'
+    else:
+        # Command was 'python3 ./list.py' or './list.py'
+        database_path = pathname + '/periodiclist.db'
 
     conn = connect_database(database_path)
     update_database(conn)
